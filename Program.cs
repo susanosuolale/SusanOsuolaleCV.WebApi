@@ -8,8 +8,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services
 builder.Services.AddControllers();
 
-// Reuse the same connection string from main project
-var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Server=(localdb)\\mssqllocaldb;Database=AppDb;Trusted_Connection=True;MultipleActiveResultSets=true";
+// Reuse the same connection string from configuration. Do NOT silently fall back to LocalDB in production.
+var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(conn))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        // In development, allow a local fallback for convenience
+        conn = "Server=(localdb)\\mssqllocaldb;Database=AppDb;Trusted_Connection=True;MultipleActiveResultSets=true";
+    }
+    else
+    {
+        // In production require the connection string to be set; fail early with clear message (no secrets exposed)
+        throw new InvalidOperationException("DefaultConnection is not configured. Set the DefaultConnection in your App Service connection strings.");
+    }
+}
+
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn));
 
 // Serve static files (to expose images from this project's wwwroot)
