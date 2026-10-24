@@ -25,7 +25,9 @@ namespace SusanOsuolaleCV.Api.Controllers
                 .Select(g => new GalleryImageDto
                 {
                     Id = g.Id,
-                    FileName = g.FileName,
+                    FileName = g.FileName,:wq
+
+
                     Title = g.Title,
                     Description = g.Description
                 })
