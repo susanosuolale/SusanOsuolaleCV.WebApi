@@ -38,12 +38,17 @@ namespace SusanOsuolaleCV.Api.Controllers
         [HttpGet("files/{fileName}")]
         public IActionResult GetFile(string fileName)
         {
-            var originalRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            var imagesPath = Path.Combine(originalRoot, "images", fileName);
-            if (!System.IO.File.Exists(imagesPath)) return NotFound();
-            //image / jpeg or mime tells the browser the response contains a JPEG image.
-            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+            string homePath = Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", "gallery-images");
+            string wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
 
+            var imagesPath = Path.Combine(homePath, fileName);
+            if (!System.IO.File.Exists(imagesPath))
+            {
+                imagesPath = Path.Combine(wwwrootPath, fileName);
+                if (!System.IO.File.Exists(imagesPath)) return NotFound();
+            }
+
+            var extension = Path.GetExtension(fileName).ToLowerInvariant();
             var mime = extension switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
@@ -52,38 +57,25 @@ namespace SusanOsuolaleCV.Api.Controllers
                 ".webp" => "image/webp",
                 _ => "application/octet-stream"
             };
-            //reads all the bytes of the file and stores in memory
             var bytes = System.IO.File.ReadAllBytes(imagesPath);
-            //sends the bytes back to whoever requested it
             return File(bytes, mime);
         }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromForm] GalleryUploadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            var file = dto?.File;
+            var title = dto?.Title;
+            var description = dto?.Description;
 
-            var file = dto.File!;
-            var title = dto.Title!;
-            var description = dto.Description!;
+            if (file == null || file.Length == 0) return BadRequest("File is required.");
 
-            // Simple server-side checks
-            var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!allowed.Contains(ext)) return BadRequest($"File type '{ext}' is not allowed.");
-            if (file.Length == 0) return BadRequest("File is empty.");
-            const long maxBytes = 5 * 1024 * 1024; // 5 MB
-            if (file.Length > maxBytes) return BadRequest($"File exceeds maximum allowed size of {maxBytes} bytes.");
+            string homePath = Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", "gallery-images");
+            if (!Directory.Exists(homePath)) Directory.CreateDirectory(homePath);
 
-            var originalRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            var imagesFolder = Path.Combine(originalRoot, "images");
-            if (!Directory.Exists(imagesFolder)) Directory.CreateDirectory(imagesFolder);
-
+            var ext = Path.GetExtension(file.FileName);
             var savedName = Guid.NewGuid().ToString() + ext;
-            var savePath = Path.Combine(imagesFolder, savedName);
+            var savePath = Path.Combine(homePath, savedName);
 
             using (var stream = System.IO.File.Create(savePath))
             {
@@ -93,8 +85,8 @@ namespace SusanOsuolaleCV.Api.Controllers
             var model = new GalleryImage
             {
                 FileName = savedName,
-                Title = title,
-                Description = description
+                Title = title ?? string.Empty,
+                Description = description ?? string.Empty
             };
 
             _context.GalleryImages.Add(model);
