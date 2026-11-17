@@ -6,6 +6,9 @@ using SusanOsuolaleCV.Models.DTOs;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
+    /// <summary>
+    /// Handles operations related to educational qualifications in the CV.
+    /// </summary>
     [ApiController]
     [Route("api/education")]
     /// <summary>
@@ -28,6 +31,10 @@ namespace SusanOsuolaleCV.Api.Controllers
         /// </summary>
         /// <returns>A list of educational qualifications.</returns>
 
+        /// <summary>
+        /// Retrieves all educational qualifications.
+        /// </summary>
+        /// <returns>A list of educational qualifications.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

@@ -6,6 +6,9 @@ using SusanOsuolaleCV.Models.DTOs;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
+    /// <summary>
+    /// Handles operations related to work experience in the CV.
+    /// </summary>
     [ApiController]
     [Route("api/experience")]
     /// <summary>
@@ -20,6 +23,10 @@ namespace SusanOsuolaleCV.Api.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Retrieves all work experiences.
+        /// </summary>
+        /// <returns>A list of work experiences.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

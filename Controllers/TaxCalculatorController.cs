@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
+    /// <summary>
+    /// Simple tax calculator endpoint using user-provided progressive brackets.
+    /// Accepts annual income and returns tax owed using configured brackets.
+    /// </summary>
     [ApiController]
     [Route("api/tax")]
     public class TaxCalculatorController : ControllerBase
@@ -41,6 +45,11 @@ namespace SusanOsuolaleCV.Api.Controllers
             new TaxBracket { Threshold = decimal.MaxValue, Rate = 0.25m }
         };
 
+        /// <summary>
+        /// Calculates the tax owed based on annual income.
+        /// </summary>
+        /// <param name="req">The tax request containing annual income.</param>
+        /// <returns>The calculated tax result.</returns>
         [HttpPost("calculate")]
         public IActionResult Calculate([FromBody] TaxRequest req)
         {

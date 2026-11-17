@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SusanOsuolaleCV.Api</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Azure.Storage.Blobs" Version="12.23.0" />

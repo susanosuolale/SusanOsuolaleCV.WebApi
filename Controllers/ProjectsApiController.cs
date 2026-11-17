@@ -6,6 +6,9 @@ using SusanOsuolaleCV.Models.DTOs;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
+    /// <summary>
+    /// Manages project-related operations in the CV.
+    /// </summary>
     [ApiController]
     [Route("api/projects")]
     /// <summary>
@@ -20,6 +23,10 @@ namespace SusanOsuolaleCV.Api.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Retrieves all projects.
+        /// </summary>
+        /// <returns>A list of project items.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

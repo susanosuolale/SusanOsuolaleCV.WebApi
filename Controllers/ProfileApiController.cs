@@ -5,6 +5,9 @@ using SusanOsuolaleCV.Models.DTOs;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
+    /// <summary>
+    /// Handles operations related to the user profile.
+    /// </summary>
     [ApiController]
     [Route("api/profile")]
     /// <summary>
@@ -19,6 +22,10 @@ namespace SusanOsuolaleCV.Api.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Retrieve the user profile.
+        /// </summary>
+        /// <returns>The user profile DTO.</returns>
         [HttpGet]
         public async Task<IActionResult> Get()
         {
