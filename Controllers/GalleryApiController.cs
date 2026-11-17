@@ -3,6 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using SusanOsuolaleCV.Data;
 using SusanOsuolaleCV.Models;
 using SusanOsuolaleCV.Models.DTOs;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
@@ -11,12 +16,18 @@ namespace SusanOsuolaleCV.Api.Controllers
     public class GalleryApiController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly BlobContainerClient _blobContainerClient;
 
-        public GalleryApiController(AppDbContext context)
+        public GalleryApiController(AppDbContext context, BlobContainerClient blobContainerClient)
         {
             _context = context;
+            _blobContainerClient = blobContainerClient;
         }
 
+        /// <summary>
+        /// Get all gallery images.
+        /// </summary>
+        /// <returns>List of gallery image DTOs.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -25,9 +36,7 @@ namespace SusanOsuolaleCV.Api.Controllers
                 .Select(g => new GalleryImageDto
                 {
                     Id = g.Id,
-                    FileName = g.FileName,:wq
-
-
+                    FileName = g.FileName,
                     Title = g.Title,
                     Description = g.Description
                 })
@@ -35,34 +44,32 @@ namespace SusanOsuolaleCV.Api.Controllers
             return Ok(list);
         }
 
-
-        // Serve the actual image file
+        /// <summary>
+        /// Retrieve a file from Azure Blob Storage.
+        /// </summary>
+        /// <param name="fileName">The name of the file</param>
+        /// <returns>The file stream</returns>
         [HttpGet("files/{fileName}")]
-        public IActionResult GetFile(string fileName)
+        public async Task<IActionResult> GetFileFromBlob(string fileName)
         {
-            string homePath = Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", "gallery-images");
-            string wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
+            BlobClient blobClient = _blobContainerClient.GetBlobClient(fileName);
 
-            var imagesPath = Path.Combine(homePath, fileName);
-            if (!System.IO.File.Exists(imagesPath))
+            if (await blobClient.ExistsAsync())
             {
-                imagesPath = Path.Combine(wwwrootPath, fileName);
-                if (!System.IO.File.Exists(imagesPath)) return NotFound();
+                BlobDownloadInfo blobDownloadInfo = await blobClient.DownloadAsync();
+                var stream = blobDownloadInfo.Content;
+                string mimeType = blobDownloadInfo.ContentType ?? "application/octet-stream";
+                return File(stream, mimeType, fileName);
             }
 
-            var extension = Path.GetExtension(fileName).ToLowerInvariant();
-            var mime = extension switch
-            {
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".png" => "image/png",
-                ".gif" => "image/gif",
-                ".webp" => "image/webp",
-                _ => "application/octet-stream"
-            };
-            var bytes = System.IO.File.ReadAllBytes(imagesPath);
-            return File(bytes, mime);
+            return NotFound();
         }
 
+        /// <summary>
+        /// Upload a new image to Azure Blob Storage.
+        /// </summary>
+        /// <param name="dto">The data transfer object containing the image file and metadata</param>
+        /// <returns>The created gallery image DTO</returns>
         [HttpPost]
         public async Task<IActionResult> Create([FromForm] GalleryUploadDto dto)
         {
@@ -76,12 +83,12 @@ namespace SusanOsuolaleCV.Api.Controllers
             if (!Directory.Exists(homePath)) Directory.CreateDirectory(homePath);
 
             var ext = Path.GetExtension(file.FileName);
-            var savedName = Guid.NewGuid().ToString() + ext;
-            var savePath = Path.Combine(homePath, savedName);
-
-            using (var stream = System.IO.File.Create(savePath))
+            var savedName = Path.Combine("files", Guid.NewGuid().ToString() + ext);
+            var blobClient = _blobContainerClient.GetBlobClient(savedName);
+            
+            using (var stream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
             }
 
             var model = new GalleryImage

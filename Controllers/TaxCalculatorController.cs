@@ -6,7 +6,10 @@ namespace SusanOsuolaleCV.Api.Controllers
     [Route("api/tax")]
     public class TaxCalculatorController : ControllerBase
     {
-        // Simple tax calculator endpoint using user-provided progressive brackets
+        /// <summary>
+        /// Simple tax calculator endpoint using user-provided progressive brackets.
+        /// Accepts annual income and returns tax owed using configured brackets.
+        /// </summary>
         // Accepts annual income and returns tax owed using configured brackets
 
         public class TaxRequest

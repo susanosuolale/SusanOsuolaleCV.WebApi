@@ -8,6 +8,9 @@ namespace SusanOsuolaleCV.Api.Controllers
 {
     [ApiController]
     [Route("api/experience")]
+    /// <summary>
+    /// Handles operations related to work experience in the CV.
+    /// </summary>
     public class ExperienceApiController : ControllerBase
     {
         private readonly AppDbContext _db;

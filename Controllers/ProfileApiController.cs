@@ -7,6 +7,9 @@ namespace SusanOsuolaleCV.Api.Controllers
 {
     [ApiController]
     [Route("api/profile")]
+    /// <summary>
+    /// Handles operations related to the user profile.
+    /// </summary>
     public class ProfileApiController : ControllerBase
     {
         private readonly AppDbContext _db;

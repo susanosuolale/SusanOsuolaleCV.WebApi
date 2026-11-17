@@ -1,15 +1,26 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using SusanOsuolaleCV.Data;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
+
+ // Configure Azure Blob Storage client
+     var blobServiceClient = new BlobServiceClient(new Uri("https://susanosuolalecvstorage.blob.core.windows.net/"), new DefaultAzureCredential());
+     var blobContainerClient = blobServiceClient.GetBlobContainerClient("gallery-images");
+
+     builder.Services.AddSingleton(blobContainerClient);
 builder.Services.AddControllers();
 
-// Reuse the same connection string from configuration. Do NOT silently fall back to LocalDB in production.
+// Reuse the same connection string from configuration.
+// Do NOT silently fall back to LocalDB in production.
 var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+
 if (string.IsNullOrWhiteSpace(conn))
 {
     if (builder.Environment.IsDevelopment())
@@ -19,21 +30,32 @@ if (string.IsNullOrWhiteSpace(conn))
     }
     else
     {
-        // In production require the connection string to be set; fail early with clear message (no secrets exposed)
-        throw new InvalidOperationException("DefaultConnection is not configured. Set the DefaultConnection in your App Service connection strings.");
+        // In production require the connection string to be set
+        throw new InvalidOperationException(
+            "DefaultConnection is not configured. Set the DefaultConnection in your App Service connection strings.");
     }
 }
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn));
+// Database configuration with automatic retries for transient SQL errors
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(conn, sqlOptions =>
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null)));
 
-// Serve static files (to expose images from this project's wwwroot)
+// Serve static files
 builder.Services.AddDirectoryBrowser();
 
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "SusanOsuolaleCV API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "SusanOsuolaleCV API",
+        Version = "v1"
+    });
 });
 
 var app = builder.Build();
@@ -47,6 +69,7 @@ app.UseHttpsRedirection();
 
 // Configure static file serving from this project's wwwroot path
 var localRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+
 if (Directory.Exists(localRoot))
 {
     app.UseStaticFiles(new StaticFileOptions
@@ -63,7 +86,7 @@ app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "SusanOsuolaleCV API v1");
-    c.RoutePrefix = "swagger"; // Serve Swagger UI at /swagger
+    c.RoutePrefix = "swagger";
 });
 
 app.MapControllers();

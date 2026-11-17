@@ -8,6 +8,9 @@ namespace SusanOsuolaleCV.Api.Controllers
 {
     [ApiController]
     [Route("api/projects")]
+    /// <summary>
+    /// Manages project-related operations in the CV.
+    /// </summary>
     public class ProjectsApiController : ControllerBase
     {
         private readonly AppDbContext _db;
