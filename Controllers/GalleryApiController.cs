@@ -52,7 +52,7 @@ namespace SusanOsuolaleCV.Api.Controllers
         [HttpGet("files/{fileName}")]
         public async Task<IActionResult> GetFileFromBlob(string fileName)
         {
-            BlobClient blobClient = _blobContainerClient.GetBlobClient(fileName);
+            BlobClient blobClient = _blobContainerClient.GetBlobClient(fileName.Replace("\\", "/"));
 
             if (await blobClient.ExistsAsync())
             {
