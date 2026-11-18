@@ -5,9 +5,12 @@ using SusanOsuolaleCV.Models;
 using SusanOsuolaleCV.Models.DTOs;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using System;
+using Microsoft.Extensions.Logging;
 using System.IO;
+using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
+using System;
+using SusanOsuolaleCV.Api.Services;
 
 namespace SusanOsuolaleCV.Api.Controllers
 {
@@ -16,12 +19,14 @@ namespace SusanOsuolaleCV.Api.Controllers
     public class GalleryApiController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly BlobContainerClient _blobContainerClient;
+        private readonly IGalleryBlobStorage _blobStorage;
+        private readonly ILogger<GalleryApiController> _logger;
 
-        public GalleryApiController(AppDbContext context, BlobContainerClient blobContainerClient)
+        public GalleryApiController(AppDbContext context, IGalleryBlobStorage blobStorage, ILogger<GalleryApiController> logger)
         {
             _context = context;
-            _blobContainerClient = blobContainerClient;
+            _blobStorage = blobStorage;
+            _logger = logger;
         }
 
         /// <summary>
@@ -31,17 +36,25 @@ namespace SusanOsuolaleCV.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var list = await _context.GalleryImages
-                .AsNoTracking()
-                .Select(g => new GalleryImageDto
-                {
-                    Id = g.Id,
-                    FileName = g.FileName,
-                    Title = g.Title,
-                    Description = g.Description
-                })
-                .ToListAsync();
-            return Ok(list);
+            try
+            {
+                var list = await _context.GalleryImages
+                    .AsNoTracking()
+                    .Select(g => new GalleryImageDto
+                    {
+                        Id = g.Id,
+                        FileName = g.FileName,
+                        Title = g.Title,
+                        Description = g.Description
+                    })
+                    .ToListAsync();
+                return Ok(list);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading gallery images");
+                return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
+            }
         }
 
         /// <summary>
@@ -49,20 +62,28 @@ namespace SusanOsuolaleCV.Api.Controllers
         /// </summary>
         /// <param name="fileName">The name of the file</param>
         /// <returns>The file stream</returns>
-        [HttpGet("files/{fileName}")]
-        public async Task<IActionResult> GetFileFromBlob(string fileName)
+        [HttpGet("files/{**blobName}")]
+        public async Task<IActionResult> GetFileFromBlob(string blobName)
         {
-            BlobClient blobClient = _blobContainerClient.GetBlobClient(fileName.Replace("\\", "/"));
-
-            if (await blobClient.ExistsAsync())
+            try
             {
-                BlobDownloadInfo blobDownloadInfo = await blobClient.DownloadAsync();
-                var stream = blobDownloadInfo.Content;
-                string mimeType = blobDownloadInfo.ContentType ?? "application/octet-stream";
-                return File(stream, mimeType, fileName);
+                // Normalize to forward slashes for blob paths
+                var blobPath = blobName.Replace("\\", "/");
+                var (stream, contentType) = await _blobStorage.DownloadAsync(blobPath);
+                var mimeType = contentType ?? "application/octet-stream";
+                // Return inline image view, not a forced download
+                return File(stream, mimeType);
             }
-
-            return NotFound();
+            catch (FileNotFoundException)
+            {
+                // Blob genuinely doesn't exist
+                return NotFound();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Blob download error for blob '{BlobName}'", blobName);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
+            }
         }
 
         /// <summary>
@@ -79,27 +100,28 @@ namespace SusanOsuolaleCV.Api.Controllers
 
             if (file == null || file.Length == 0) return BadRequest("File is required.");
 
-            string homePath = Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", "gallery-images");
-            if (!Directory.Exists(homePath)) Directory.CreateDirectory(homePath);
-
-            var ext = Path.GetExtension(file.FileName);
-            var savedName = Path.Combine("files", Guid.NewGuid().ToString() + ext);
-            var blobClient = _blobContainerClient.GetBlobClient(savedName);
-            
-            using (var stream = file.OpenReadStream())
-            {
-                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
-            }
+            // Upload to blob storage via service (no local disk usage)
+            var blobName = await _blobStorage.UploadAsync(file, file.ContentType);
 
             var model = new GalleryImage
             {
-                FileName = savedName,
+                FileName = blobName,
                 Title = title ?? string.Empty,
                 Description = description ?? string.Empty
             };
 
             _context.GalleryImages.Add(model);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Roll back uploaded blob if DB save fails to avoid orphaned blob
+                await _blobStorage.DeleteAsync(blobName);
+                _logger.LogError(ex, "DB save failed after blob upload for blob '{BlobName}'", blobName);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Internal server error");
+            }
 
             var resultDto = new GalleryImageDto { Id = model.Id, FileName = model.FileName, Title = model.Title, Description = model.Description };
             return CreatedAtAction(nameof(GetAll), new { }, resultDto);

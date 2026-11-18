@@ -3,6 +3,9 @@ using Microsoft.OpenApi.Models;
 using SusanOsuolaleCV.Data;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using System;
+using System.IO;
+using SusanOsuolaleCV.Api.Services;
 
 
 
@@ -10,11 +13,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 
- // Configure Azure Blob Storage client
+  // Configure Azure Blob Storage client
+     //C# object to communicate with azure blob storage
      var blobServiceClient = new BlobServiceClient(new Uri("https://susanosuolalecvstorage.blob.core.windows.net/"), new DefaultAzureCredential());
+     //C# object to communicate with your container(gallery-images) on azure blob storage
      var blobContainerClient = blobServiceClient.GetBlobContainerClient("gallery-images");
 
+     // Register blob container client and blob storage service (DI)
      builder.Services.AddSingleton(blobContainerClient);
+     builder.Services.AddSingleton<SusanOsuolaleCV.Api.Services.IGalleryBlobStorage>(sp =>
+     {
+         return new SusanOsuolaleCV.Api.Services.AzureGalleryBlobStorage(blobContainerClient);
+     });
 builder.Services.AddControllers();
 
 // Reuse the same connection string from configuration.
